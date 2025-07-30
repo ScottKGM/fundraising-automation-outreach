@@ -16,3 +16,7 @@ Automated outreach tool to send personalized follow-up emails to local businesse
 - OpenAI API (`gpt-3.5-turbo`)
 - Gmail SMTP
 - `.env` for secrets (not included in repo)
+
+## 🙏 Credits
+
+Built by Scott Kelly (Kingwood High School HOSA)

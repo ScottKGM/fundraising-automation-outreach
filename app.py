@@ -20,16 +20,18 @@ def get_leads(sheet_url: str) -> list[dict]:
     rows = sheet.get_all_records() 
 
     leads = []
-    for row in rows:
-        lead = {
-            "owner_name": row.get("Name", "None"),
-            "business_name": row.get("Business Name"),
-            "email": row.get("Email Address"),
-            "phone": row.get("Phone Number"),
-            "website": row.get("website") 
-        }
-        if lead["email"]:   
-            leads.append(lead)
+    for i, row in enumerate(rows, start=2):
+        if row.get("status") != "Sent":
+            status_cell = f"H{i}"
+            lead = {
+                "owner_name": row.get("Name", "None"),
+                "business_name": row.get("Business Name"),
+                "email": row.get("Email Address"),
+                "phone": row.get("Phone Number"),
+                "website": row.get("website") 
+            }
+            if lead["email"] and lead["email"].strip():
+                leads.append((lead, status_cell))
 
     return leads
 
@@ -132,6 +134,7 @@ Please note:
 - The email body should mention that these resources are included for convenience, but do not include any image or file placeholders.
 - Do not add links or fake contact info — just reference the flyer and QR code naturally in the body.
 - Keep the email under 250-words
+- Do not generate a Subject, only generate the text body
 
 
 """
@@ -158,20 +161,47 @@ def generate_email(prompt: str) -> str:
     return response.choices[0].message.content.strip()
 
 
+    
+import smtplib
+from email.message import EmailMessage
+
+def send_email(to_adress: str, body: str):
+    msg = EmailMessage()
+    msg["Subject"] = "Partner with Kingwood HOSA: Empower Student Health Careers"
+    msg["From"] = os.getenv("EMAIL_ADDRESS")
+    msg["To"] = to_adress
+    msg.set_content(body)
+
+    with open("hosa-flyer.pdf", "rb") as f:
+        file_data = f.read()
+        file_name = f.name
+        msg.add_attachment(file_data, maintype="application", subtype="pdf", filename=file_name)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(os.getenv("EMAIL_ADDRESS"), os.getenv("EMAIL_APP_PASSWORD"))
+        smtp.send_message(msg)
+
+
+scotts_email = "cpt.scottbk@gmail.com"
+
 
 if __name__ == "__main__":
     SHEET_URL = "https://docs.google.com/spreadsheets/d/15XUXXHHf6d9NqdwNbkRhHQYdrjfOd6zCST8F2Na-X7A"
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    sheet = gspread.authorize(ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)).open_by_url(SHEET_URL).sheet1
     leads = get_leads(SHEET_URL)
-    for lead in leads[:3]:
+    for lead, status_cell in leads:
         prompt = generate_prompt(lead)
-        email = generate_email(prompt)
+        body = generate_email(prompt)
         print(f"TO: {lead['email']}\n")
-        print(email)
+        print(body)
         print("-" * 80)
+        send_email(lead["email"], body)
+
+        sheet.update(range_name=status_cell, values=[["Sent"]])
         
-
-    
-       
-
-
 
